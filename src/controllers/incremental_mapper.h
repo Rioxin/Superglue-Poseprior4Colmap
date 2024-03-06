@@ -82,7 +82,7 @@ struct IncrementalMapperOptions {
   double max_extra_param = 1.0;
 
   // Which intrinsic parameters to optimize during the reconstruction.
-  bool ba_refine_focal_length = false;
+  bool ba_refine_focal_length = true;
   bool ba_refine_principal_point = false;
   bool ba_refine_extra_params = true;
 

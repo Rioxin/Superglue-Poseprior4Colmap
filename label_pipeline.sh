@@ -33,11 +33,12 @@ fi
 python3 tools/sql.py --project_dir ${dataset_path}
 echo "python sql.py has done"
 
-# ./build/src/exe/colmap sequential_matcher \
-#    --database_path ${dataset_path}/pose1.db \
-#    --SequentialMatching.loop_detection=true \
-#    --SequentialMatching.vocab_tree_path ${vocab_path}
-# echo "end with sequential_matcher"
+./build/src/exe/colmap sequential_matcher \
+   --database_path ${dataset_path}/pose1.db \
+   --SequentialMatching.loop_detection=true \
+   --SequentialMatching.vocab_tree_path ${vocab_path}
+echo "end with sequential_matcher"
+
 
 # if [ ! -d "${dataset_path}/sparse/" ]; then
 #     echo "mkdir sparse"

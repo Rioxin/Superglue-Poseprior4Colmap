@@ -55,4 +55,3 @@ if __name__ == "__main__":
     json_file = origin_dir+"/colmap_pose.json"
     data_list = extract_data_from_txt(txt_file)
     data_to_json(data_list, json_file)
-
