@@ -1,8 +1,8 @@
 #!/bin/sh
 # The project folder must contain a folder "images" with all the images.
 
-dataset_path="/home/qcraft/super_point/test4"
-vocab_path="/home/qcraft/super_point/vocab_tree_flickr100K_words256K.bin"
+dataset_path="/home/qcraft/colmap_test/test/test_right"
+vocab_path="/home/qcraft/colmap_test/vocab_tree_flickr100K_words256K.bin"
 
 if [ ! -f "${dataset_path}/pose1.db" ]; then
     echo "touch ${dataset_path}/pose1.db "
@@ -10,16 +10,16 @@ if [ ! -f "${dataset_path}/pose1.db" ]; then
 fi
 
 
- # --ImageReader.mask_path ${dataset_path}/panonet \
+#  --ImageReader.mask_path ${dataset_path}/panonet \
 
-# ./build/src/exe/colmap feature_extractor \
-#     --database_path ${dataset_path}/pose1.db \
-#     --image_path ${dataset_path}/images \
-#     --ImageReader.mask_path ${dataset_path}/panonet \
-#     --ImageReader.camera_model=PINHOLE \
-#     --ImageReader.single_camera_per_folder=true \
-#     --SiftExtraction.estimate_affine_shape=true \
-#     --SiftExtraction.domain_size_pooling=true
+./build/src/exe/colmap feature_extractor \
+    --database_path ${dataset_path}/pose1.db \
+    --image_path ${dataset_path}/images \
+    --ImageReader.mask_path ${dataset_path}/panonet \
+    --ImageReader.camera_model=PINHOLE \
+    --ImageReader.single_camera_per_folder=true \
+    --SiftExtraction.estimate_affine_shape=true \
+    --SiftExtraction.domain_size_pooling=true
 
 
 # ./build/src/exe/colmap feature_extractor \
@@ -39,16 +39,27 @@ echo "python sql.py has done"
 #    --SequentialMatching.vocab_tree_path ${vocab_path}
 # echo "end with sequential_matcher"
 
+# if [ ! -d "${dataset_path}/sparse/" ]; then
+#     echo "mkdir sparse"
+#     mkdir ${dataset_path}/sparse
+# fi
+
+# ./build/src/colmap/exe/colmap mapper \
+#    --database_path ${dataset_path}/pose1.db \
+#    --SequentialMatching.loop_detection=true \
+#    --SequentialMatching.vocab_tree_path ${vocab_path}
+# echo "end with sequential_matcher"
+
 if [ ! -d "${dataset_path}/sparse/" ]; then
     echo "mkdir sparse"
     mkdir ${dataset_path}/sparse
 fi
 
-./build/src/exe/colmap mapper \
-   --database_path ${dataset_path}/pose1.db \
-   --image_path ${dataset_path}/images \
-   --output_path ${dataset_path}/sparse 
-echo "end with colmap mapper"
+# ./build/src/exe/colmap mapper \
+#    --database_path ${dataset_path}/pose1.db \
+#    --image_path ${dataset_path}/images \
+#    --output_path ${dataset_path}/sparse 
+# echo "end with colmap mapper"
 
 # if [ ! -d "${dataset_path}/dense/" ]; then
 #     echo "mkdir dense"
