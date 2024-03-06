@@ -151,6 +151,55 @@ class BundleAdjustmentConstantPoseCostFunction {
   const double observed_y_;
 };
 
+// Add gps position constraint.
+class PoseCenterConstraintCostFunction{
+  public: 
+    PoseCenterConstraintCostFunction(
+       const Eigen::Vector3d & center,
+       const Eigen::Vector3d & weight
+    ):pose_center_constraint_(center),weight_(weight){}
+
+    static ceres::CostFunction* Create(const Eigen::Vector3d & center,const Eigen::Vector3d & weight) {
+      return (new ceres::AutoDiffCostFunction<
+              PoseCenterConstraintCostFunction, 3, 4,3>(
+          new PoseCenterConstraintCostFunction(center,weight)));
+    }
+
+  template <typename T> bool operator()(
+    const T* const qvec, // qcw
+    const T* const tvec, // tcw
+    T* residuals
+  )const{
+    using Vec3T = Eigen::Matrix<T,3,1>;
+
+    Vec3T pose_center; // twc_sfm
+
+    // Rotate the point according the camera rotation
+    // Inverse rotation as conjugate quaternion.
+    const Eigen::Quaternion<T> qcw(qvec[0], -qvec[1], -qvec[2], -qvec[3]);
+    Vec3T tcw(tvec[0],tvec[1],tvec[2]);
+    pose_center = qcw * -tcw;
+
+    // Eigen::Matrix<T, 3, 3, Eigen::RowMajor> R; //Rcw
+    // ceres::QuaternionToRotation(qvec, R.data());
+    // Eigen::Matrix<T, 3, 3, Eigen::RowMajor> Rwc;
+    // Rwc = R.inverse();
+    // T qwc[4];
+    // ceres::RotationMatrixToQuaternion(Rwc.data(),qwc);
+    // ceres::QuaternionRotatePoint(qwc,tvec,pose_center.data());
+    // pose_center = pose_center * T(-1); //twc
+
+    Eigen::Map<Vec3T> residuals_eigen(residuals);
+    residuals_eigen = weight_.cast<T>().cwiseProduct(pose_center - pose_center_constraint_.cast<T>());
+
+    return true;
+  }
+
+  private: 
+  Eigen::Vector3d weight_;
+  Eigen::Vector3d pose_center_constraint_;
+};
+
 // Rig bundle adjustment cost function for variable camera pose and calibration
 // and point parameters. Different from the standard bundle adjustment function,
 // this cost function is suitable for camera rigs with consistent relative poses

@@ -408,9 +408,33 @@ void SiftFeatureExtractorThread::Run() {
                           &image_data.descriptors);
           }
           if (image_data.mask.Data()) {
+            LOG(ERROR)<<"Mask key points";
             MaskKeypoints(image_data.mask, &image_data.keypoints,
                           &image_data.descriptors);
           }
+
+          // size_t out_index = 0;
+          // for (size_t i = 0; i < image_data.keypoints.size(); ++i) {
+          //   if ( static_cast<int>(image_data.keypoints.at(i).y)<=100 ||
+          //         static_cast<int>(image_data.keypoints.at(i).y)>=400 ) { 
+          //     // Delete this keypoint by not copying it to the output.
+          //   } else {
+          //     // Retain this keypoint by copying it to the output index (in case this
+          //     // index differs from its current position).
+          //     if (out_index != i) {
+          //       image_data.keypoints.at(out_index) = image_data.keypoints.at(i);
+          //       for (int col = 0; col < image_data.descriptors.cols(); ++col) {
+          //         image_data.descriptors(out_index, col) = image_data.descriptors(i, col);
+          //       }
+          //     }
+          //     out_index += 1;
+          //   }
+          // }
+
+          // image_data.keypoints.resize(out_index);
+          // image_data.descriptors.conservativeResize(out_index, image_data.descriptors.cols());
+
+
         } else {
           image_data.status = ImageReader::Status::FAILURE;
         }

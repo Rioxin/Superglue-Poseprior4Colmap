@@ -157,6 +157,26 @@ class BundleAdjustmentConfig {
   const std::unordered_set<point3D_t>& ConstantPoints() const;
   const std::vector<int>& ConstantTvec(const image_t image_id) const;
 
+  void SetFittingError(const double pose_center_robust_fitting_error){
+    pose_center_robust_fitting_error_=pose_center_robust_fitting_error;
+  };
+  double GetFittingError(){return pose_center_robust_fitting_error_;};
+  void SetPriorPoseWeight(const Eigen::Vector3d prior_pose_weight){
+    prior_pose_weight_=prior_pose_weight;
+  };
+  Eigen::Vector3d GetPriorPoseWeight(){return prior_pose_weight_;};
+
+  // whether to use position prior
+  void SetUsagePriorStatus(const bool b_usable_prior){
+    b_usable_prior_=b_usable_prior;
+  };
+  bool GetUsagePriorStatus(){return b_usable_prior_;};
+
+  double pose_center_robust_fitting_error_;
+  Eigen::Vector3d prior_pose_weight_;
+  // whether to use position prior
+  bool b_usable_prior_=false; 
+
  private:
   std::unordered_set<camera_t> constant_camera_ids_;
   std::unordered_set<image_t> image_ids_;

@@ -678,7 +678,93 @@ bool IncrementalMapper::AdjustGlobalBundle(
                                        "registered for global "
                                        "bundle-adjustment";
 
+  
+#ifdef ENABLE_POSITION_PRIOR
+  using Mat3X = Eigen::Matrix<double, 3, Eigen::Dynamic>;
+
+  bool b_usable_prior = options.b_usable_prior; 
+  double pose_center_robust_fitting_error = 0.0;
+  bool generate_gps_prior=false;
+
+  // - Estimate SIM3 transformation between SFM position and prior position
+  // - Compute a robust X-Y affine transformation & apply it
+  // - This early transformation enhance the conditionning (solution closer to the Prior coordinate system)
+  if(reg_image_ids.size()>= 3 && b_usable_prior)
+  {
+    
+    SimilarityTransform3 sim3(1, Eigen::Vector4d(1, 0, 0, 0),Eigen::Vector3d(0, 0, 0));
+    
+    // Collect corresponding camera centers
+    std::vector<Eigen::Vector3d> X_SfM, X_GPS;
+    for (const image_t image_id : reg_image_ids) 
+    {
+      const Image &image = reconstruction_->Image(image_id);
+      if(!image.HasTvecPrior() || !image.HasTvecPrior())
+        continue;
+      Eigen::Vector3d sfm_pose_center = image.ProjectionCenter();
+      Eigen::Vector3d gps_pose_center = ProjectionCenterFromPose(image.QvecPrior(), image.TvecPrior());
+      X_SfM.push_back(sfm_pose_center);
+      X_GPS.push_back(gps_pose_center);
+    }
+
+    bool use_robust_estimation = true; // whether to use RANSAC to estimate sim3
+    int min_inlier_positions = 3; 
+
+    if(use_robust_estimation)
+    {
+      // Only compute the alignment if there are enough correspondences.
+      if (X_SfM.size() < static_cast<size_t>(min_inlier_positions)) {
+        return false;
+      }
+
+      // Robustly estimate transformation using RANSAC.
+      RANSACOptions ransac_options;
+      ransac_options.max_error = 10;
+      LORANSAC<SimilarityTransformEstimator<3>, SimilarityTransformEstimator<3>>
+          ransac(ransac_options);
+      
+      const auto report = ransac.Estimate(X_SfM, X_GPS);
+      if (report.support.num_inliers < static_cast<size_t>(min_inlier_positions))
+      {
+        bool success = sim3.Estimate(X_SfM, X_GPS);
+        
+      }
+      else
+        sim3 = SimilarityTransform3(report.model);
+    }
+    else
+    {
+      // use all positions 
+      bool success = sim3.Estimate(X_SfM, X_GPS);
+    }
+    
+    reconstruction_->Transform(sim3);
+    {
+      std::vector<Eigen::Vector3d> X_SfM_new; // transformed pose
+      for (const image_t image_id : reg_image_ids) 
+      {
+        const Image &image = reconstruction_->Image(image_id);
+        if(!image.HasTvecPrior() || !image.HasTvecPrior())
+          continue;
+        Eigen::Vector3d sfm_pose_center = image.ProjectionCenter();
+        X_SfM_new.push_back(sfm_pose_center);
+      }
+      Eigen::Vector3d residual = (Eigen::Map<Mat3X>(X_SfM_new[0].data(), 3, X_SfM_new.size()) - Eigen::Map<Mat3X>(X_GPS[0].data(), 3, X_GPS.size())).colwise().norm();
+      std::sort(residual.data(), residual.data() + residual.size());
+      pose_center_robust_fitting_error = residual(residual.size()/2);
+    }
+    generate_gps_prior=true;
+  }
+  else
+  {
+    /* at least 3 registed images */
+    // nothing to do
+  }
+  
+#endif
+
   // Avoid degeneracies in bundle adjustment.
+  // 过滤到深度为负的,避免退化
   reconstruction_->FilterObservationsWithNegativeDepth();
 
   // Configure bundle adjustment.
@@ -688,6 +774,7 @@ bool IncrementalMapper::AdjustGlobalBundle(
   }
 
   // Fix the existing images, if option specified.
+  // 固定已经register 的,默认参数是不固定,如果设置为true,只会对新进来的图像gba
   if (options.fix_existing_images) {
     for (const image_t image_id : reg_image_ids) {
       if (existing_image_ids_.count(image_id)) {
@@ -696,12 +783,28 @@ bool IncrementalMapper::AdjustGlobalBundle(
     }
   }
 
+#ifndef ENABLE_POSITION_PRIOR
   // Fix 7-DOFs of the bundle adjustment problem.
   ba_config.SetConstantPose(reg_image_ids[0]);
   if (!options.fix_existing_images ||
       !existing_image_ids_.count(reg_image_ids[1])) {
     ba_config.SetConstantTvec(reg_image_ids[1], {0});
   }
+#endif
+  
+#ifdef ENABLE_POSITION_PRIOR
+  if(b_usable_prior)
+  {
+    ba_config.SetFittingError(pose_center_robust_fitting_error);
+    // TODO: need to automatically adjust XYZ weight 
+    const Eigen::Vector3d xyz_weight = Eigen::Vector3d::Constant(1.0); 
+    ba_config.SetPriorPoseWeight(xyz_weight);
+  }
+  // Set use prior status
+  ba_config.SetUsagePriorStatus(generate_gps_prior);
+  LOG(ERROR)<<"ba config "<<ba_config.GetUsagePriorStatus();
+  
+#endif
 
   // Run bundle adjustment.
   BundleAdjuster bundle_adjuster(ba_options, ba_config);
@@ -710,9 +813,43 @@ bool IncrementalMapper::AdjustGlobalBundle(
   }
 
   // Normalize scene for numerical stability and
-  // to avoid large scale changes in viewer.
-  reconstruction_->Normalize();
+// #ifdef ENABLE_POSITION_PRIOR
+//   if(b_usable_prior)
+//   {
+//     //--
+//     // - Compute some fitting statistics
+//     //--
+//     // Collect corresponding camera centers
+//     std::vector<Eigen::Vector3d> X_SfM, X_GPS;
+//     for (const image_t image_id : reg_image_ids) 
+//     {
+//       const Image &image = reconstruction_->Image(image_id);
+//       if(!image.HasTvecPrior() || !image.HasTvecPrior())
+//         continue;
+//       Eigen::Vector3d sfm_pose_center = image.ProjectionCenter();
+//       Eigen::Vector3d gps_pose_center = ProjectionCenterFromPose(image.QvecPrior(), image.TvecPrior());
+//       X_SfM.push_back(sfm_pose_center);
+//       X_GPS.push_back(gps_pose_center);
+//     }
+//     // Compute the registration fitting error (once BA with Prior have been used):
+//     if (X_GPS.size() > 3)
+//     {
+//       // Compute the median residual error
+//       Eigen::Vector3d residual = (Eigen::Map<Mat3X>(X_SfM[0].data(), 3, X_SfM.size()) - Eigen::Map<Mat3X>(X_GPS[0].data(), 3, X_GPS.size())).colwise().norm();
+//       std::cout
+//         << "Pose prior statistics (user units):\n"
+//         << " - Starting median fitting error: " << pose_center_robust_fitting_error << "\n"
+//         << " - Final fitting error:";
+//       minMaxMeanMedian<Vec::Scalar>(residual.data(), residual.data() + residual.size());
+//     }
 
+//   }
+
+// #else
+//   // Normalize scene for numerical stability and
+//   // to avoid large scale changes in viewer.
+//   reconstruction_->Normalize();
+// #endif
   return true;
 }
 

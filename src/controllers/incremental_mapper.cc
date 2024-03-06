@@ -51,7 +51,7 @@ void AdjustGlobalBundle(const IncrementalMapperOptions& options,
   BundleAdjustmentOptions custom_ba_options = options.GlobalBundleAdjustment();
 
   const size_t num_reg_images = mapper->GetReconstruction().NumRegImages();
-
+   
   // Use stricter convergence criteria for first registered images.
   const size_t kMinNumRegImagesForFastBA = 10;
   if (num_reg_images < kMinNumRegImagesForFastBA) {
@@ -110,7 +110,8 @@ void IterativeGlobalRefinement(const IncrementalMapperOptions& options,
   CompleteAndMergeTracks(options, mapper);
   std::cout << "  => Retriangulated observations: "
             << mapper->Retriangulate(options.Triangulation()) << std::endl;
-
+  LOG(ERROR)<<"Reg images: "<<mapper->GetReconstruction().NumRegImages();
+  LOG(ERROR)<<"Reg points : "<<mapper->GetReconstruction().NumPoints3D();
   for (int i = 0; i < options.ba_global_max_refinements; ++i) {
     const size_t num_observations =
         mapper->GetReconstruction().ComputeNumObservations();
@@ -324,16 +325,20 @@ void IncrementalMapperController::Run() {
       break;
     }
 
-    std::cout << "  => Relaxing the initialization constraints." << std::endl;
+   
     init_mapper_options.init_min_num_inliers /= 2;
+    LOG(ERROR) << "  => Relaxing the initialization constraints " <<
+      init_mapper_options.init_min_num_inliers;
     Reconstruct(init_mapper_options);
 
     if (reconstruction_manager_->Size() > 0 || IsStopped()) {
       break;
     }
 
-    std::cout << "  => Relaxing the initialization constraints." << std::endl;
+   
     init_mapper_options.init_min_tri_angle /= 2;
+    LOG(ERROR) << "  => Relaxing the initialization constraints. " << 
+      init_mapper_options.init_min_tri_angle;
     Reconstruct(init_mapper_options);
   }
 

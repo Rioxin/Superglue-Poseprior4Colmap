@@ -58,6 +58,8 @@ struct RANSACOptions;
 class DatabaseCache;
 class CorrespondenceGraph;
 
+#define ENABLE_POSITION_PRIOR
+
 // Reconstruction class holds all information about a single reconstructed
 // model. It is used by the mapping and bundle adjustment classes and can be
 // written to and read from disk.
@@ -71,7 +73,7 @@ class Reconstruction {
   };
 
   Reconstruction();
-
+  
   // Get number of objects.
   inline size_t NumCameras() const;
   inline size_t NumImages() const;

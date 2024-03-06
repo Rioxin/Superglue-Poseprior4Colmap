@@ -369,10 +369,10 @@ void BundleAdjuster::AddImageToProblem(const image_t image_id,
     }
 
     num_observations += 1;
-    point3D_num_observations_[point2D.Point3DId()] += 1;
+    point3D_num_observations_[point2D.Point3DId()] += 1; 
 
     Point3D& point3D = reconstruction->Point3D(point2D.Point3DId());
-    assert(point3D.Track().Length() > 1);
+    assert(point3D.Track().Length() > 1); 
 
     ceres::CostFunction* cost_function = nullptr;
 
@@ -389,7 +389,7 @@ void BundleAdjuster::AddImageToProblem(const image_t image_id,
 
 #undef CAMERA_MODEL_CASE
       }
-
+      
       problem_->AddResidualBlock(cost_function, loss_function,
                                  point3D.XYZ().data(), camera_params_data);
     } else {
@@ -410,6 +410,25 @@ void BundleAdjuster::AddImageToProblem(const image_t image_id,
                                  camera_params_data);
     }
   }
+
+#ifdef ENABLE_POSITION_PRIOR
+    if(config_.GetUsagePriorStatus()){
+      const Eigen::Vector3d pose_center_constraint = ProjectionCenterFromPose(image.QvecPrior(), image.TvecPrior());
+      
+      // TODO: need to auto adjust XYZ weight 
+      const Eigen::Vector3d xyz_weight = config_.GetPriorPoseWeight();
+      // Add the cost functor (distance from Pose prior to the SfM_Data Pose center)
+      ceres::CostFunction* cost_function = nullptr;
+      double pose_center_robust_fitting_error = config_.GetFittingError();
+      cost_function = PoseCenterConstraintCostFunction::Create(pose_center_constraint, xyz_weight);
+      problem_->AddResidualBlock(
+                              cost_function,
+                              new ceres::HuberLoss(
+                              std::pow(pose_center_robust_fitting_error,2)),
+                              qvec_data,
+                              tvec_data);                     
+    }
+#endif
 
   if (num_observations > 0) {
     camera_ids_.insert(image.CameraId());
