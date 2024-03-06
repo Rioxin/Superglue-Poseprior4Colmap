@@ -7,6 +7,7 @@ from database import COLMAPDatabase
 import json
 import sys
 import sqlite3
+import pprint
 
 from scipy.spatial.transform import Rotation
 
@@ -127,6 +128,94 @@ def add_keypoints(self, image_id, keypoints):
             "INSERT INTO keypoints VALUES (?, ?, ?, ?)",
             (image_id,) + keypoints.shape + (array_to_blob(keypoints),))
 
+def add_matches_to_database(db_file, matches):
+    conn = sqlite3.connect(db_file)
+    cursor = conn.cursor()
+    for match in matches:
+        cursor.execute("INSERT INTO matches VALUES (?, ?, ?, ?)", match)
+    conn.commit()
+    conn.close()
+
+MAX_IMAGE_ID = 2**31 - 1
+def image_ids_to_pair_id(image_id1, image_id2):
+    if image_id1 > image_id2:
+        image_id1, image_id2 = image_id2, image_id1
+    return image_id1 * MAX_IMAGE_ID + image_id2
+
+def add_matches(self, image_id1, image_id2, matches):
+        assert(len(matches.shape) == 2)
+        assert(matches.shape[1] == 2)
+
+        if image_id1 > image_id2:
+            matches = matches[:,::-1]
+
+        pair_id = image_ids_to_pair_id(image_id1, image_id2)
+        matches = np.asarray(matches, np.uint32)
+        self.execute(
+            "INSERT INTO matches VALUES (?, ?, ?, ?)",
+            (pair_id,) + matches.shape + (array_to_blob(matches),))
+def add_two_view_geometry(self, image_id1, image_id2, matches,
+                              F=np.eye(3), E=np.eye(3), H=np.eye(3),
+                              config=2):
+        assert(len(matches.shape) == 2)
+        assert(matches.shape[1] == 2)
+
+        if image_id1 > image_id2:
+            matches = matches[:,::-1]
+
+        pair_id = image_ids_to_pair_id(image_id1, image_id2)
+        matches = np.asarray(matches, np.uint32)
+        F = np.asarray(F, dtype=np.float64)
+        E = np.asarray(E, dtype=np.float64)
+        H = np.asarray(H, dtype=np.float64)
+        self.execute(
+            "INSERT INTO two_view_geometries VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (pair_id,) + matches.shape + (array_to_blob(matches), config,
+             array_to_blob(F), array_to_blob(E), array_to_blob(H),))
+
+def read_matches_from_txt(image_id_to_filename,txt_file, db):
+    matches = []
+    with open(txt_file, 'r') as file:
+        lines = file.readlines()
+        i = 0
+        image_idx = {}
+        current_idx = 0
+        matchess = []  # 用于存储所有匹配对
+        while i < len(lines):
+            # 跳过空行
+            if not lines[i].strip():
+                i += 1
+                continue
+            # 检测含有 ".png" 的行作为文件名
+            if ".png" in lines[i]:
+                # 提取图像文件名
+                image1, image2 = lines[i].split()
+                # if image1 not in image_idx:
+                #     image_idx[image1] = current_idx
+                #     current_idx += 1
+                # if image2 not in image_idx:
+                #     image_idx[image2] = current_idx
+                #     current_idx += 1
+                idx1 = image_id_to_filename[image1]
+                idx2 = image_id_to_filename[image2]
+                i += 1
+                # 提取匹配对
+                while i < len(lines) and lines[i].strip():
+                    match = tuple(map(int, lines[i].strip().split()))
+                    matchess.append(match)
+                    # 调用 add_matches 函数将匹配对添加到数据库中
+                    # add_matches(db, image_id1=idx1, image_id2=idx2, matches=np.array([match]))
+                    i += 1
+                # matches_pair = np.array(matchess)
+                matches_pair = np.array([list(match) for match in matchess])
+                add_two_view_geometry(db, image_id1=idx1, image_id2=idx2, matches=matches_pair,
+                                      F=np.eye(3), E=np.eye(3), H=np.eye(3), config=3)
+                # 清空 matchess 列表
+                matchess = []
+            else:
+                i += 1
+
+
 # 执行命令并计时
 def operate(cmd):
     print(cmd)
@@ -146,16 +235,26 @@ def process_txt_files(folder_path, db):
     txt_files = sorted([filename for filename in os.listdir(folder_path) if filename.endswith('.txt')])
 
     # 初始化image_id计数器
-    image_id_counter = 1
+    image_id_counter = 0
     # 总特征点计数器
     total_keypoints = 0
-    
+
+    # 建立图像ID与文件名的映射关系
+    image_id_to_filename = {}
+
     # 遍历排序后的txt文件
     for filename in txt_files:
         # 使用image_id计数器作为image_id
         image_id = image_id_counter
         image_id_counter += 1
         
+         # 去掉文件名的txt后缀
+        image_filename = filename[:-4]
+        
+        # 将图像ID与文件名建立对应关系
+        image_id_to_filename[image_filename] = image_id
+        # print(image_id)
+        # print(image_id_to_filename[image_id])
         # 构建txt文件的完整路径
         txt_file_path = os.path.join(folder_path, filename)
         
@@ -173,19 +272,36 @@ def process_txt_files(folder_path, db):
                 cols = int(round(float(data[1])))  # 第二个是cols
                 # 将特征点数据转换为numpy数组
                 keypoints_data.append([rows, cols])
-        
+
         # 将特征点数据转换为NumPy数组
         keypoints_data = np.array(keypoints_data)
-        
+
+        # 根据原始数据生成新的特征点数据
+        n_keypoints = keypoints_data.shape[0]
+        keypoints_data = np.concatenate([keypoints_data.astype(np.float32),
+            np.ones((n_keypoints, 1)).astype(np.float32), np.zeros((n_keypoints, 1)).astype(np.float32)], axis=1)
+
         # 统计特征点数量
-        total_keypoints += len(keypoints_data)
+        total_keypoints += n_keypoints
         
         # 将特征点添加到数据库
         db.add_keypoints(image_id, keypoints_data)
-    
+    # 打印总特征点数量
+    print("Total keypoints:", total_keypoints)
     # 返回总特征点数量
-    return total_keypoints
+    return image_id_to_filename
 
+def print_table_info(cursor):
+  print("+++++++++++++ Table Info ++++++++++++++++")
+  cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+  tables = cursor.fetchall()
+  for tbl_name in tables:
+      tbl_name = tbl_name[0]
+  
+      print(tbl_name + ':')
+      cursor.execute("PRAGMA table_info({})".format(tbl_name))
+      pprint.pprint(cursor.fetchall())
+      print("+++++++++++++++++++++++++++++++++++++++++")
 
 # 主函数入口
 if __name__ == "__main__":
@@ -217,15 +333,20 @@ if __name__ == "__main__":
     # 初始化相机和图像到数据库中
     images_name = init_cameras_database(db, images_path, "PINHOLE", True)
     update_poses_in_db(c, poses, intrinsics)
-    # 从图像中提取特征并存储到数据库
+
     # 指定包含txt文件的文件夹路径
     folder_path = os.path.join(args.projpath, "colmap_desc")
 
-    total_keypoints=process_txt_files(folder_path,db)
-    # 匹配图像特征并存储到数据库(TODO)
-    match_list_path = os.path.join(args.projpath, "image_pairs_to_match.txt")
-    # 打印总特征点数量
-    print("Total keypoints:", total_keypoints)
+    # 匹配图像特征并存储到数据库
+    image_id_to_filename=process_txt_files(folder_path,db)
+        
+    # 读取匹配结果并添加到数据库
+    match_list_path = os.path.join(args.projpath, "superglue_matches.txt")
+    read_matches_from_txt(image_id_to_filename,match_list_path,db)
+
+    # 打印表结构
+    # print_table_info(c)
+
     # 提交事务并关闭数据库连接
     db.commit()
     c.close()

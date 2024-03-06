@@ -1,8 +1,9 @@
 #!/bin/sh
 dataset_path="/home/qcraft/colmap_test/test/test_right"
+pair_nums=1 #定义匹配的对数
 
 # 生成匹配对
-python super_glue/generatePair.py ${dataset_path}/images ${dataset_path}/image_pairs.txt
+python super_glue/generatePair.py ${dataset_path}/images ${dataset_path}/image_pairs.txt ${pair_nums}
 
 # 用superglue生成特征点和匹配对
 python super_glue/match_pairs.py \
@@ -18,7 +19,7 @@ python super_glue/match_pairs.py \
 # 转换格式
 python super_glue/super.py --working_dir=${dataset_path}
 
-# 把pose和内参初始化到数据库里（TODO：把匹配对写入到数据库里，问题项：把特征点写入数据库但是运行时会闪退）
+# 把pose和内参初始化到数据库里
 python super_glue/feature_match_to_database.py  --projpath ${dataset_path}
 
 # 手动导入：
