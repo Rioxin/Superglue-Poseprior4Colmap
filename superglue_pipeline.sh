@@ -2,10 +2,13 @@
 set -e
 
 dataset_path="/home/qcraft/colmap_test/test/test_right_s"
-pair_nums=1 #定义匹配的对数
+pair_nums=10 #定义匹配的对数
 # 定义图片的宽和高
 Width=1024
 Height=512
+
+# 给图片加上mask
+python super_glue/mask.py "${dataset_path}/panonet" "${dataset_path}/mask"
 
 # 生成匹配对
 python super_glue/generatePair.py "${dataset_path}/images" "${dataset_path}/image_pairs.txt" "${pair_nums}"
@@ -14,6 +17,7 @@ python super_glue/generatePair.py "${dataset_path}/images" "${dataset_path}/imag
 python super_glue/match_pairs.py \
 --input_dir "${dataset_path}/images" \
 --output_dir "${dataset_path}/desc" \
+--mask_dir "${dataset_path}/mask" \
 --input_pairs "${dataset_path}/image_pairs.txt" \
 --superglue outdoor \
 --max_keypoints 2048 \

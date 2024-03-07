@@ -50,6 +50,7 @@ import random
 import numpy as np
 import matplotlib.cm as cm
 import torch
+import cv2
 
 
 from models.matching import Matching
@@ -60,6 +61,31 @@ from models.utils import (compute_pose_error, compute_epipolar_error,
                           scale_intrinsics)
 
 torch.set_grad_enabled(False)
+def is_black(image, point, threshold=10):
+    x, y = int(point[0]), int(point[1])
+    if len(image.shape) == 2:  # If image is grayscale
+        pixel = image[y, x]
+        return pixel < threshold
+    else:
+        pixel = image[y, x]
+        pixel = [int(value) for value in pixel]
+        return all(value < threshold for value in pixel)
+
+def remove_black_keypoints(image, keypoints, threshold=10, mask_image=None):
+    non_black_keypoints = []
+    if mask_image is None:
+        for kp in keypoints:
+            x, y = int(kp[0]), int(kp[1])
+            if not is_black(image, (x, y), threshold):
+                non_black_keypoints.append(kp)
+    else:
+        # 读取 mask 图像
+        mask = cv2.imread(mask_image, cv2.IMREAD_GRAYSCALE)
+        for kp in keypoints:
+            x, y = int(kp[0]), int(kp[1])
+            if not is_black(image, (x, y), threshold) and not is_black(mask, (x, y), threshold):
+                non_black_keypoints.append(kp)
+    return np.array(non_black_keypoints)
 
 
 if __name__ == '__main__':
@@ -77,12 +103,15 @@ if __name__ == '__main__':
         '--output_dir', type=str, default='dump_match_pairs/',
         help='Path to the directory in which the .npz results and optionally,'
              'the visualization images are written')
+    parser.add_argument(
+        '--mask_dir', type=str, default='assets/mask_images/',
+    help='Path to the directory that contains the mask images')
 
     parser.add_argument(
         '--max_length', type=int, default=-1,
         help='Maximum number of pairs to evaluate')
     parser.add_argument(
-        '--resize', type=int, nargs='+', default=[640, 480],
+        '--resize', type=int, nargs='+', default=[1024, 512],
         help='Resize the input image before running inference. If two numbers, '
              'resize to the exact dimensions, if one number, resize the max '
              'dimension, if -1, do not resize')
@@ -268,7 +297,6 @@ if __name__ == '__main__':
                 input_dir/name0, input_dir/name1))
             exit(1)
         timer.update('load_image')
-
         if do_match:
             # Perform the matching.
             pred = matching({'image0': inp0, 'image1': inp1})
@@ -277,16 +305,33 @@ if __name__ == '__main__':
             matches, conf = pred['matches0'], pred['matching_scores0']
             timer.update('matcher')
 
+            mask_image0 = str(Path(opt.mask_dir) / Path(name0).name)
+            mask_image1 = str(Path(opt.mask_dir) / Path(name1).name)
+            kpts0 = remove_black_keypoints(image0, kpts0, mask_image=mask_image0)
+            kpts1 = remove_black_keypoints(image1, kpts1, mask_image=mask_image1)
+
+            # Filter matches based on valid keypoints
+            valid_matches = matches > -1
+            valid_indices = np.where(valid_matches)[0]
+            
+            valid_indices = valid_indices[(valid_indices < len(kpts0)) & (matches[valid_indices] < len(kpts1))]
+            valid_matches = matches[valid_indices]
+            # 根据更新后的匹配项索引数组，保留对应的匹配项
+            matches = matches[:len(kpts0)]
+
+            valid_conf = conf[valid_indices]
+            valid_kpts0 = kpts0[valid_indices]
+            valid_kpts1 = kpts1[valid_matches]
             # Write the matches to disk.
             out_matches = {'keypoints0': kpts0, 'keypoints1': kpts1,
                            'matches': matches, 'match_confidence': conf}
             np.savez(str(matches_path), **out_matches)
-
         # Keep the matching keypoints.
-        valid = matches > -1
-        mkpts0 = kpts0[valid]
-        mkpts1 = kpts1[matches[valid]]
-        mconf = conf[valid]
+        mkpts0 = valid_kpts0
+        mkpts1 = valid_kpts1
+        mconf = valid_conf
+        
+
 
         if do_eval:
             # Estimate the pose and compute the pose error.
