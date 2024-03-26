@@ -14,26 +14,22 @@ def plot_trajectory_xy(trajectory, title):
 
     plt.plot(x_values, y_values, label=title)
 
+def read_and_plot(origi_dir,pose_name):
+    trajectory = read_trajectory_from_file(origi_dir+"aligned_"+pose_name+"_trajectory.txt")
+    plot_trajectory_xy(trajectory,pose_name)
+
+
 def main():
     # 读取轨迹文件
-    base_path = "/home/qcraft/colmap_test/test/test_right/sparse/"
-    gt_file = "aligned_rtk_trajectory.txt"
-    gnss_file = "aligned_gnss_trajectory.txt"
-    smooth_file = "aligned_smooth_trajectory.txt"
-    colmap_file = "aligned_colmap_trajectory.txt"
+    origin_dir="/home/super_point/test1/"
+    read_and_plot(origin_dir,"rtk")
+    # read_and_plot(origin_dir,"rtk")
+    read_and_plot(origin_dir,"smooth")
+    # read_and_plot(origin_dir,"colmap")
+    # read_and_plot(origin_dir,"super_glue")
+    
 
-    gt_trajectory = read_trajectory_from_file(base_path + gt_file)
-    gnss_trajectory = read_trajectory_from_file(base_path + gnss_file)
-    smooth_trajectory = read_trajectory_from_file(base_path + smooth_file)
-    colmap_trajectory = read_trajectory_from_file(base_path + colmap_file)
-    
-    # 绘制xy平面上的轨迹
-    plot_trajectory_xy(gt_trajectory, "Gt Trajectory")
-    plot_trajectory_xy(gnss_trajectory, "Gnss Trajectory")
-    plot_trajectory_xy(smooth_trajectory, "Smooth Trajectory")
-    plot_trajectory_xy(colmap_trajectory, "Colmap Trajectory")
-    
-    plt.axis('equal')
+    # 设置图例和标题
     plt.legend()
     plt.xlabel('X')
     plt.ylabel('Y')

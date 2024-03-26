@@ -46,7 +46,7 @@ def show_image_features(image_dir,cursor):
             
             # print(point[0],point[1])
             cv2.circle(image, (int(point[0]),int(point[1])), 3, color, -1)
-        save_path="/home/qcraft/super_point/"+str(image_id)+".png"   
+        save_path="/home/super_point/"+str(image_id)+".png"   
         print(save_path)
         cv2.imwrite(save_path,image)
         # import sys
@@ -58,7 +58,7 @@ if __name__=="__main__":
   parser = argparse.ArgumentParser(description="COLMAP database tool")
   parser.add_argument(
       "--project_dir",
-      default="/home/qcraft/sculpture_project",
+      default="/home/sculpture_project",
       metavar="FILE",
       help="path to config file",
       type=str,

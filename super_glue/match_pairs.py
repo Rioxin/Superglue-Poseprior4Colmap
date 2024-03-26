@@ -51,7 +51,7 @@ import numpy as np
 import matplotlib.cm as cm
 import torch
 import cv2
-
+import os
 
 from models.matching import Matching
 from models.utils import (compute_pose_error, compute_epipolar_error,
@@ -71,22 +71,28 @@ def is_black(image, point, threshold=10):
         pixel = [int(value) for value in pixel]
         return all(value < threshold for value in pixel)
 
-def remove_black_keypoints(image, keypoints, threshold=10, mask_image=None):
+def remove_black_keypoints(add_mask,image, keypoints, threshold=10, mask_image=None):
     non_black_keypoints = []
+    indices_to_delete = []  # 存储要删除的索引
+    index_mapping = {}  # 存储删除前后点的索引对应关系
     if mask_image is None:
-        for kp in keypoints:
+        for idx, kp in enumerate(keypoints):
             x, y = int(kp[0]), int(kp[1])
             if not is_black(image, (x, y), threshold):
                 non_black_keypoints.append(kp)
+            else:
+                indices_to_delete.append(idx)  # 添加要删除的索引
     else:
-        # 读取 mask 图像
         mask = cv2.imread(mask_image, cv2.IMREAD_GRAYSCALE)
-        for kp in keypoints:
+        for idx, kp in enumerate(keypoints):
             x, y = int(kp[0]), int(kp[1])
             if not is_black(image, (x, y), threshold) and not is_black(mask, (x, y), threshold):
                 non_black_keypoints.append(kp)
-    return np.array(non_black_keypoints)
-
+                index_mapping[idx] = len(non_black_keypoints) - 1  # 存储索引对应关系
+            else:
+                index_mapping[idx] = -1   # 被删除的点的索引设为-1
+                indices_to_delete.append(idx)  # 添加要删除的索引
+    return np.array(non_black_keypoints), indices_to_delete,index_mapping
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
@@ -106,12 +112,15 @@ if __name__ == '__main__':
     parser.add_argument(
         '--mask_dir', type=str, default='assets/mask_images/',
     help='Path to the directory that contains the mask images')
+    parser.add_argument(
+    '--add_mask', type=str, default='True', metavar='True/False',
+    help='Whether to add mask or not. Accepted values: True/False')
 
     parser.add_argument(
         '--max_length', type=int, default=-1,
         help='Maximum number of pairs to evaluate')
     parser.add_argument(
-        '--resize', type=int, nargs='+', default=[1024, 512],
+        '--resize', type=int, nargs='+', default=[-1],
         help='Resize the input image before running inference. If two numbers, '
              'resize to the exact dimensions, if one number, resize the max '
              'dimension, if -1, do not resize')
@@ -240,7 +249,10 @@ if __name__ == '__main__':
         stem0, stem1 = Path(name0).stem, Path(name1).stem
         matches_path = output_dir / '{}_{}_matches.npz'.format(stem0, stem1)
         eval_path = output_dir / '{}_{}_evaluation.npz'.format(stem0, stem1)
-        viz_path = output_dir / '{}_{}_matches.{}'.format(stem0, stem1, opt.viz_extension)
+        path_viz = output_dir.parent / 'desc_viz'
+        if not os.path.exists(path_viz):
+            os.makedirs(path_viz)
+        viz_path = path_viz / '{}_{}_matches.{}'.format(stem0, stem1, opt.viz_extension)
         viz_eval_path = output_dir / \
             '{}_{}_evaluation.{}'.format(stem0, stem1, opt.viz_extension)
 
@@ -305,33 +317,33 @@ if __name__ == '__main__':
             matches, conf = pred['matches0'], pred['matching_scores0']
             timer.update('matcher')
 
-            mask_image0 = str(Path(opt.mask_dir) / Path(name0).name)
-            mask_image1 = str(Path(opt.mask_dir) / Path(name1).name)
-            kpts0 = remove_black_keypoints(image0, kpts0, mask_image=mask_image0)
-            kpts1 = remove_black_keypoints(image1, kpts1, mask_image=mask_image1)
+            add_mask = opt.add_mask.lower() in ['true', 't', 'yes', 'y']
+            if(add_mask):
+                mask_image0 = str(Path(opt.mask_dir) / Path(name0).name)
+                mask_image1 = str(Path(opt.mask_dir) / Path(name1).name)
+                kpts0, indices_to_delete_0 ,map1= remove_black_keypoints(add_mask,image0, kpts0, mask_image=mask_image0 )
+                kpts1, indices_to_delete_1,map2= remove_black_keypoints(add_mask,image1, kpts1, mask_image=mask_image1 )
+                matches = np.delete(matches, indices_to_delete_0, axis=0)
+                mask = np.isin(matches, indices_to_delete_1)
+                num_deleted_matches = np.sum(mask)
+                matches[mask] = -1
+                replaced_matches = []
+                for match in matches:
+                    if match in map2:
+                        replaced_matches.append(map2[match])
+                    else:
+                        replaced_matches.append(match)
+                replaced_matches = np.array(replaced_matches)
+                matches = replaced_matches
 
-            # Filter matches based on valid keypoints
-            valid_matches = matches > -1
-            valid_indices = np.where(valid_matches)[0]
-            
-            valid_indices = valid_indices[(valid_indices < len(kpts0)) & (matches[valid_indices] < len(kpts1))]
-            valid_matches = matches[valid_indices]
-            # 根据更新后的匹配项索引数组，保留对应的匹配项
-            matches = matches[:len(kpts0)]
-
-            valid_conf = conf[valid_indices]
-            valid_kpts0 = kpts0[valid_indices]
-            valid_kpts1 = kpts1[valid_matches]
-            # Write the matches to disk.
             out_matches = {'keypoints0': kpts0, 'keypoints1': kpts1,
                            'matches': matches, 'match_confidence': conf}
             np.savez(str(matches_path), **out_matches)
-        # Keep the matching keypoints.
-        mkpts0 = valid_kpts0
-        mkpts1 = valid_kpts1
-        mconf = valid_conf
-        
-
+            
+            valid = matches > -1
+            mkpts0 = kpts0[valid]
+            mkpts1 = mkpts0
+            mconf = conf
 
         if do_eval:
             # Estimate the pose and compute the pose error.

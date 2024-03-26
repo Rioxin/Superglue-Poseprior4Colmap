@@ -1,5 +1,6 @@
 import json
 import numpy as np
+import argparse
 
 def quaternion_to_euler_angle(qw, qx, qy, qz):
     """
@@ -41,17 +42,23 @@ def extract_data_from_txt(txt_file):
                     "x": tx,
                     "y": ty,
                     "z": tz
-                })
-    sorted_data_list= sorted(data_list,key=lambda x:x["timestamp"])           
-    return sorted_data_list
+                })   
+    sorted_list=sorted(data_list,key=lambda x: x["timestamp"])    
+    return sorted_list
 
 def data_to_json(data_list, json_file):
     with open(json_file, 'w') as f:
         json.dump(data_list, f, indent=4)
 
 if __name__ == "__main__":
-    origin_dir="/home/qcraft/colmap_test/test/test_right/sparse"
-    txt_file = origin_dir+"/images.txt"
+    parser = argparse.ArgumentParser(description='一个简单的命令行参数解析示例')
+    parser.add_argument('--input_dir', type=str, help='输入文件的路径')
+    args = parser.parse_args()
+    
+    origin_dir=args.input_dir
+    txt_file = origin_dir+"/sparse/0/images.txt"
     json_file = origin_dir+"/colmap_pose.json"
+    print(txt_file)
+    print(json_file)
     data_list = extract_data_from_txt(txt_file)
     data_to_json(data_list, json_file)

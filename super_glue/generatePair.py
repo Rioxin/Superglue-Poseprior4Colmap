@@ -11,7 +11,7 @@ def sort_images_by_name(input_folder, output_file, nums):
     # 遍历排序后的图片文件列表，生成前后 nums 张都匹配的相邻图片的名称对
     for i in range(len(image_files)):
         # 获取前后 nums 张图片的索引范围
-        start_index = max(0, i - nums)
+        start_index = i
         end_index = min(len(image_files) - 1, i + nums)
         
         # 生成当前图片与前后 nums 张图片的名称对

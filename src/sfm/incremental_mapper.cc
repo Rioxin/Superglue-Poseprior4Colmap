@@ -282,15 +282,20 @@ bool IncrementalMapper::RegisterInitialImagePair(const Options& options,
   // Estimate two-view geometry
   //////////////////////////////////////////////////////////////////////////////
 
-  if (!EstimateInitialTwoViewGeometry(options, image_id1, image_id2)) {
-    return false;
-  }
+  // if (!EstimateInitialTwoViewGeometry(options, image_id1, image_id2)) {
+  //   return false;
+  // }
+  
+  // image1.Qvec() = ComposeIdentityQuaternion();
+  // image1.Tvec() = Eigen::Vector3d(0, 0, 0);
+  // image2.Qvec() = prev_init_two_view_geometry_.qvec;
+  // image2.Tvec() = prev_init_two_view_geometry_.tvec;
 
-  image1.Qvec() = ComposeIdentityQuaternion();
-  image1.Tvec() = Eigen::Vector3d(0, 0, 0);
-  image2.Qvec() = prev_init_two_view_geometry_.qvec;
-  image2.Tvec() = prev_init_two_view_geometry_.tvec;
-
+  image1.Qvec() = image1.QvecPrior();
+  image1.Tvec() = image1.TvecPrior();
+  image2.Qvec() = image2.QvecPrior();
+  image2.Tvec() = image2.TvecPrior();
+ 
   const Eigen::Matrix3x4d proj_matrix1 = image1.ProjectionMatrix();
   const Eigen::Matrix3x4d proj_matrix2 = image2.ProjectionMatrix();
   const Eigen::Vector3d proj_center1 = image1.ProjectionCenter();
@@ -1281,59 +1286,60 @@ void IncrementalMapper::DeRegisterImageEvent(const image_t image_id) {
 
 bool IncrementalMapper::EstimateInitialTwoViewGeometry(
     const Options& options, const image_t image_id1, const image_t image_id2) {
-  const image_pair_t image_pair_id =
-      Database::ImagePairToPairId(image_id1, image_id2);
+  return true;
+  // const image_pair_t image_pair_id =
+  //     Database::ImagePairToPairId(image_id1, image_id2);
 
-  if (prev_init_image_pair_id_ == image_pair_id) {
-    return true;
-  }
+  // if (prev_init_image_pair_id_ == image_pair_id) {
+  //   return true;
+  // }
 
-  const Image& image1 = database_cache_->Image(image_id1);
-  const Camera& camera1 = database_cache_->Camera(image1.CameraId());
+  // const Image& image1 = database_cache_->Image(image_id1);
+  // const Camera& camera1 = database_cache_->Camera(image1.CameraId());
 
-  const Image& image2 = database_cache_->Image(image_id2);
-  const Camera& camera2 = database_cache_->Camera(image2.CameraId());
+  // const Image& image2 = database_cache_->Image(image_id2);
+  // const Camera& camera2 = database_cache_->Camera(image2.CameraId());
 
-  const CorrespondenceGraph& correspondence_graph =
-      database_cache_->CorrespondenceGraph();
-  const FeatureMatches matches =
-      correspondence_graph.FindCorrespondencesBetweenImages(image_id1,
-                                                            image_id2);
+  // const CorrespondenceGraph& correspondence_graph =
+  //     database_cache_->CorrespondenceGraph();
+  // const FeatureMatches matches =
+  //     correspondence_graph.FindCorrespondencesBetweenImages(image_id1,
+  //                                                           image_id2);
 
-  std::vector<Eigen::Vector2d> points1;
-  points1.reserve(image1.NumPoints2D());
-  for (const auto& point : image1.Points2D()) {
-    points1.push_back(point.XY());
-  }
+  // std::vector<Eigen::Vector2d> points1;
+  // points1.reserve(image1.NumPoints2D());
+  // for (const auto& point : image1.Points2D()) {
+  //   points1.push_back(point.XY());
+  // }
 
-  std::vector<Eigen::Vector2d> points2;
-  points2.reserve(image2.NumPoints2D());
-  for (const auto& point : image2.Points2D()) {
-    points2.push_back(point.XY());
-  }
+  // std::vector<Eigen::Vector2d> points2;
+  // points2.reserve(image2.NumPoints2D());
+  // for (const auto& point : image2.Points2D()) {
+  //   points2.push_back(point.XY());
+  // }
+  
+  // TwoViewGeometry two_view_geometry;
+  // TwoViewGeometry::Options two_view_geometry_options;
+  // two_view_geometry_options.ransac_options.min_num_trials = 30;
+  // two_view_geometry_options.ransac_options.max_error = options.init_max_error;
+  // two_view_geometry.EstimateCalibrated(camera1, points1, camera2, points2,
+  //                                      matches, two_view_geometry_options);
 
-  TwoViewGeometry two_view_geometry;
-  TwoViewGeometry::Options two_view_geometry_options;
-  two_view_geometry_options.ransac_options.min_num_trials = 30;
-  two_view_geometry_options.ransac_options.max_error = options.init_max_error;
-  two_view_geometry.EstimateCalibrated(camera1, points1, camera2, points2,
-                                       matches, two_view_geometry_options);
+  // if (!two_view_geometry.EstimateRelativePose(camera1, points1, camera2,
+  //                                             points2)) {
+  //   return false;
+  // }
 
-  if (!two_view_geometry.EstimateRelativePose(camera1, points1, camera2,
-                                              points2)) {
-    return false;
-  }
+  // if (static_cast<int>(two_view_geometry.inlier_matches.size()) >=
+  //         options.init_min_num_inliers &&
+  //     std::abs(two_view_geometry.tvec.z()) < options.init_max_forward_motion &&
+  //     two_view_geometry.tri_angle > DegToRad(options.init_min_tri_angle)) {
+  //   prev_init_image_pair_id_ = image_pair_id;
+  //   prev_init_two_view_geometry_ = two_view_geometry;
+  //   return true;
+  // }
 
-  if (static_cast<int>(two_view_geometry.inlier_matches.size()) >=
-          options.init_min_num_inliers &&
-      std::abs(two_view_geometry.tvec.z()) < options.init_max_forward_motion &&
-      two_view_geometry.tri_angle > DegToRad(options.init_min_tri_angle)) {
-    prev_init_image_pair_id_ = image_pair_id;
-    prev_init_two_view_geometry_ = two_view_geometry;
-    return true;
-  }
-
-  return false;
+  // return false;
 }
 
 }  // namespace colmap

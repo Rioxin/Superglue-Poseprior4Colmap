@@ -254,6 +254,7 @@ int RunMapper(int argc, char** argv) {
   // not create sub-folders but directly write the results.
   if (input_path != "" && reconstruction_manager.Size() > 0) {
     reconstruction_manager.Get(0).Write(output_path);
+    reconstruction_manager.Get(0).WriteText(output_path);
   }
 
   return EXIT_SUCCESS;

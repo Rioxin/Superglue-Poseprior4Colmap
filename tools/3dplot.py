@@ -18,7 +18,7 @@ def plot_trajectory_xyz(trajectory, title):
 
 def main():
     # 读取轨迹文件
-    base_path = "/home/qcraft/colmap_test/test/test_right/sparse/"
+    base_path = "/home/colmap_test/test/test_right/sparse/"
     gt_file = "aligned_rtk_trajectory.txt"
     gnss_file = "aligned_gnss_trajectory.txt"
     smooth_file = "aligned_smooth_trajectory.txt"

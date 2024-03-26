@@ -60,8 +60,8 @@ def convert_db_to_json(db_file, json_file):
 
 if __name__ == "__main__":
     # 输入数据库文件路径和要保存的 JSON 文件路径
-    db_file = "/home/qcraft/colmap_test/test/test_left/pose1.db"
-    json_file = "/home/qcraft/colmap_test/test/test_left/colmap.json"
+    db_file = "/home/colmap_test/test/test_left/pose1.db"
+    json_file = "/home/colmap_test/test/test_left/colmap.json"
 
     # 执行转换
     convert_db_to_json(db_file, json_file)

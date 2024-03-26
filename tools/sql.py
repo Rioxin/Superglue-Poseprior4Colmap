@@ -111,7 +111,7 @@ if __name__=="__main__":
   parser = argparse.ArgumentParser(description="COLMAP database tool")
   parser.add_argument(
       "--project_dir",
-      default="/home/qcraft/colmap_test/test/test_right",
+      default="/home/colmap_test/test/test_right",
       metavar="FILE",
       help="path to config file",
       type=str,

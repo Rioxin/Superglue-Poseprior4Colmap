@@ -190,12 +190,6 @@ def read_matches_from_txt(image_id_to_filename,txt_file, db):
             if ".png" in lines[i]:
                 # 提取图像文件名
                 image1, image2 = lines[i].split()
-                # if image1 not in image_idx:
-                #     image_idx[image1] = current_idx
-                #     current_idx += 1
-                # if image2 not in image_idx:
-                #     image_idx[image2] = current_idx
-                #     current_idx += 1
                 idx1 = image_id_to_filename[image1]
                 idx2 = image_id_to_filename[image2]
                 i += 1
@@ -204,9 +198,7 @@ def read_matches_from_txt(image_id_to_filename,txt_file, db):
                     match = tuple(map(int, lines[i].strip().split()))
                     matchess.append(match)
                     # 调用 add_matches 函数将匹配对添加到数据库中
-                    # add_matches(db, image_id1=idx1, image_id2=idx2, matches=np.array([match]))
                     i += 1
-                # matches_pair = np.array(matchess)
                 matches_pair = np.array([list(match) for match in matchess])
                 add_two_view_geometry(db, image_id1=idx1, image_id2=idx2, matches=matches_pair,
                                       F=np.eye(3), E=np.eye(3), H=np.eye(3), config=3)

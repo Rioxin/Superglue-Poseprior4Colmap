@@ -25,7 +25,7 @@ def shrink_mask(input_mask_dir, output_mask_dir):
             _, mask_img = cv2.threshold(mask_img, 127, 255, cv2.THRESH_BINARY)
             
             # 缩小白色部分（腐蚀操作）
-            kernel_erode = np.ones((15, 15), np.uint8)  # 定义腐蚀的核
+            kernel_erode = np.ones((40, 40), np.uint8)  # 定义腐蚀的核
             eroded_mask = cv2.erode(mask_img, kernel_erode, iterations=1)  # 执行腐蚀操作
             
             # 构建输出图片路径

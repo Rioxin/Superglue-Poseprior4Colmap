@@ -1,4 +1,5 @@
 import sqlite3
+import sys
 
 def delete_keypoints_table(db_file):
     try:
@@ -17,5 +18,8 @@ def delete_keypoints_table(db_file):
         print("An error occurred:", e)
 
 if __name__ == "__main__":
-    db_file = input("Enter the path to the SQLite database file which need delete keypoints: ")
+    if len(sys.argv) != 2:
+        print("Usage: python script.py <path_to_db_file>")
+        sys.exit(1)
+    db_file = sys.argv[1]
     delete_keypoints_table(db_file)
